@@ -85,6 +85,20 @@ Three distinct failure patterns are embedded for discovery during the demo:
 
 ---
 
+## Step 0: Set Context
+
+**WHY**: Tell CoCo which database and warehouse to use for the entire session.
+
+**PROMPT**:
+
+```
+Use database COCO_WORKSHOP and warehouse COCO_WORKSHOP_WH for this session.
+```
+
+> **Talk track**: "First we point CoCo at our workshop database and Gen2 warehouse. Everything we build will live here."
+
+---
+
 ## ACT 1: Data Engineering (Bronze to Gold)
 
 ### Step 1: Clean Supplier Data
@@ -182,7 +196,9 @@ Using COMPLETE with llama3.1-70b, compare these categories against the summaries
 Using AI_CLASSIFY with task_description 'Classify the truck driver warranty complaint into the primary symptom category', classify each customer_complaint in COCO_WORKSHOP.BRONZE.WARRANTY_CLAIMS_RAW using the categories from COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES. Save as COCO_WORKSHOP.SILVER.WARRANTY_CLAIMS with all original columns plus a symptom_category column.
 ```
 
-> **Talk track**: "AI_CLASSIFY reads each complaint and assigns the best-matching symptom category. No training data, no fine-tuning — it just works. 500 claims classified in about 30 seconds."
+> **Talk track**: "AI_CLASSIFY reads each complaint and assigns the best-matching symptom category. No training data, no fine-tuning — it just works."
+
+**TIMING**: ~1-3 minutes. AI_CLASSIFY makes one LLM inference call per row (500 calls). Execution time varies by region and Cortex AI load.
 
 **RESULT**: SILVER.WARRANTY_CLAIMS — 500 rows, all original columns + SYMPTOM_CATEGORY.
 
@@ -199,6 +215,8 @@ Using AI_CLASSIFY with task_description 'Identify which single sub-component cau
 ```
 
 > **Talk track**: "This is the magic moment. The AI reads each technician's repair notes and figures out which sub-component actually failed. It uses the parts BOM as the category list — so for a turbocharger claim, it chooses from VGT Actuator, Compressor Wheel, Bearing Housing, etc. Now we can trace failures back to specific suppliers and batches."
+
+**TIMING**: ~2-5 minutes. This is the longest-running step — each of the 500 claims requires an AI_CLASSIFY call with a correlated subquery to look up the sub-parts for that claim's part type. Let it run.
 
 **RESULT**: GOLD.WARRANTY_CLAIMS — 500 rows, all columns + FAILED_SUB_PART. This is the final claims table.
 
