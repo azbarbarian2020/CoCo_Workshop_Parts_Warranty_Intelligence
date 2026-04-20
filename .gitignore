@@ -1,0 +1,7 @@
+.DS_Store
+__pycache__/
+*.pyc
+.snowflake/
+data/docs/schematics/
+*.egg-info/
+.env

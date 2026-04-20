@@ -1,0 +1,13 @@
+SUPPLIER_ID,COMPANY_NAME,CONTACT_NAME,PHONE,EMAIL,ADDRESS,CITY,STATE,ZIP,COUNTRY,CERTIFICATION
+SUP-001,Precision Dynamics LLC,Robert Chen,(312) 555-0147,rchen@precisiondynamics.com,"4200 Industrial Blvd, Suite 200",Chicago,Illinois,60632,US,"ISO 9001, AS9100"
+SUP-002,"NOVATECH ELECTRONICS, LLC",Sarah Kim,555.887.2340,skim@novatech-electronics.com,8800 Technology Dr,San Jose,CA,95134,USA,ISO 9001
+SUP-003,Allied Turbo Systems,James Wright,(216) 555 0198,j.wright@alliedturbo.com,1500 Aerospace Pkwy.,Cleveland,OH,44135,US,"ISO 9001, AS9100, NADCAP"
+SUP-004," Midwest Pneumatics, Inc. ",Tom Bradley,3145550276,tbradley@midwest-pneumatics.com,700 Manufacturing Way,St. Louis,MO,63101,United States,ISO 9001
+SUP-005,Pacific Valve & Fitting Co.,Lisa Nakamura,(503) 555-0163,l.nakamura@pacificvalve.com,"2300 River Road, Bldg C",Portland,Oregon,97201,US,"iso 9001, iso 14001"
+SUP-006,GREAT LAKES CASTINGS CORP,Mike O'Brien,616-555-0189,mobrien@greatlakescastings.com,5500 Foundry Ave,Grand Rapids,mi,49503,US,"ISO 9001, IATF 16949"
+SUP-007,"precision dynamics, llc",Robert Chen,312-555-0147,rchen@precisiondynamics.com,"4200 Industrial Blvd., Ste. 200",Chicago,IL,60632,US,"ISO 9001, AS9100"
+SUP-008,Southeastern Gasket & Seal,David Martinez,(704) 555.0134,dmartinez@segasket.com,1200 Industrial Park Dr.,Charlotte,North Carolina,28208,USA,ISO 9001
+SUP-009,ThermalTech Coatings Inc,Karen Phillips,(248) 555-0156,kphillips@thermaltechcoatings.com,3300 Innovation Blvd,Troy,MI,48083,United States,"ISO 9001, NADCAP"
+SUP-010,Berg Elektronik GmbH,Hans Mueller,+49 711 555 0142,h.mueller@berg-elektronik.de,Industriestrasse 45,Stuttgart,Baden-Wurttemberg,70173,DE,"ISO 9001, IATF 16949, VDA 6.3"
+SUP-011,Novatech Electronics LLC,Sarah Kim,(408) 555-2340,sarah.kim@novatech-electronics.com,8800 Technology Drive,San Jose,California,95134,US,ISO 9001
+SUP-012,heartland steel fabrication,Mark Thompson,(515) 555-0171,mthompson@heartlandsteel.com,900 Steel Mill Rd,Des Moines,IA,50309,US,ISO 9001

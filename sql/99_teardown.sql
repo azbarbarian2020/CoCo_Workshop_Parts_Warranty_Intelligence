@@ -1,0 +1,37 @@
+-- ============================================================================
+-- CoCo Workshop: Reset for Re-Demo
+-- Drops everything EXCEPT Bronze tables and stages so you can re-run the demo.
+-- Run this between demo runs to start fresh from Step 1.
+-- ============================================================================
+
+USE DATABASE COCO_WORKSHOP;
+
+-- Agent (must drop before semantic view)
+DROP AGENT IF EXISTS GOLD.WARRANTY_AGENT;
+
+-- Cortex Search Service
+DROP CORTEX SEARCH SERVICE IF EXISTS GOLD.PARTS_MANUAL_SEARCH;
+
+-- Semantic View
+DROP SEMANTIC VIEW IF EXISTS GOLD.WARRANTY_ANALYTICS;
+
+-- Gold tables
+DROP TABLE IF EXISTS GOLD.WARRANTY_CLAIMS;
+DROP TABLE IF EXISTS GOLD.PARTS;
+DROP TABLE IF EXISTS GOLD.SUPPLIERS;
+
+-- Silver tables
+DROP TABLE IF EXISTS SILVER.WARRANTY_CLAIMS;
+DROP TABLE IF EXISTS SILVER.SYMPTOM_CATEGORIES;
+DROP TABLE IF EXISTS SILVER.COMPLAINT_SUMMARIES;
+
+-- Bronze artifacts created by search-optimization skill
+DROP TABLE IF EXISTS BRONZE.DOCS_EMBEDDINGS;
+DROP FILE FORMAT IF EXISTS BRONZE.DOCS_EMBEDDINGS_FILE_FORMAT;
+DROP PROCEDURE IF EXISTS BRONZE.DOCS_EMBEDDINGS_PROC(ARRAY);
+
+-- Verify only Bronze source tables remain
+SELECT 'SUPPLIER_RAW' AS REMAINING, COUNT(*) AS ROWS FROM BRONZE.SUPPLIER_RAW
+UNION ALL SELECT 'PARTS_RAW', COUNT(*) FROM BRONZE.PARTS_RAW
+UNION ALL SELECT 'WARRANTY_CLAIMS_RAW', COUNT(*) FROM BRONZE.WARRANTY_CLAIMS_RAW;
+-- Expected: 12, 25000, 500
