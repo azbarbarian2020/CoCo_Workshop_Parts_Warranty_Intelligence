@@ -2,7 +2,7 @@ import os
 from fpdf import FPDF
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, "data", "docs")
+OUTPUT_DIR = os.path.join(BASE_DIR, "docs")
 SCHEMATIC_DIR = os.path.join(BASE_DIR, "data", "docs", "schematics")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(SCHEMATIC_DIR, exist_ok=True)

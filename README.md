@@ -20,48 +20,39 @@ Three data stories are embedded for the agent to discover:
 
 - Snowflake account with `ACCOUNTADMIN` role (or equivalent)
 - [Cortex Code (CoCo)](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code) access
-- [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) installed and configured
-- A warehouse — the setup script creates `COCO_WORKSHOP_WH` (Gen2 Medium) automatically
+- [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) installed and configured (for Option B file upload)
 
 ## Quick Start
 
-### 1. Create infrastructure
+### Phase 1: Create Infrastructure
 
-Run **Sections 1-2** of `sql/00_setup.sql` in Snowflake to create the database, schemas, and stages:
+Run **Sections 1-2** of [`sql/00_setup.sql`](sql/00_setup.sql) in a Snowflake worksheet. This creates the database, warehouse, schemas, and stages.
 
-```sql
--- Run in Snowflake worksheet or Snow CLI
-CREATE DATABASE IF NOT EXISTS COCO_WORKSHOP;
-USE DATABASE COCO_WORKSHOP;
-CREATE WAREHOUSE IF NOT EXISTS COCO_WORKSHOP_WH
-  GENERATION = '2' WAREHOUSE_SIZE = 'MEDIUM'
-  AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = TRUE;
-USE WAREHOUSE COCO_WORKSHOP_WH;
-CREATE SCHEMA IF NOT EXISTS BRONZE;
-CREATE SCHEMA IF NOT EXISTS SILVER;
-CREATE SCHEMA IF NOT EXISTS GOLD;
-CREATE STAGE IF NOT EXISTS BRONZE.DATA_STAGE;
-CREATE STAGE IF NOT EXISTS BRONZE.DOCS
-  DIRECTORY = (ENABLE = TRUE)
-  ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE');
-```
+### Phase 2: Upload Files
 
-### 2. Upload files
+Upload the CSV data files and PDF manuals to the stages created in Phase 1.
+
+**Option A — Snowsight UI (no CLI required)**
+
+1. Download the 3 CSV files from the [`data/`](data/) folder and the 5 PDF files from the [`docs/`](docs/) folder in this repo
+2. In Snowsight, navigate to **Data** > **Databases** > **COCO_WORKSHOP** > **BRONZE**
+3. Upload the 3 CSVs to the `DATA_STAGE` stage
+4. Upload the 5 PDFs to the `DOCS` stage
+
+**Option B — Snow CLI (from cloned repo)**
 
 ```bash
-snow stage copy data/suppliers.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
-snow stage copy data/parts.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
-snow stage copy data/warranty_claims.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
-snow stage copy data/docs/PM_*.pdf @COCO_WORKSHOP.BRONZE.DOCS --overwrite
+snow stage copy data/*.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
+snow stage copy docs/PM_*.pdf @COCO_WORKSHOP.BRONZE.DOCS --overwrite
 ```
 
-### 3. Load Bronze tables
+### Phase 3: Load Bronze Tables
 
-Run **Sections 3-5** of `sql/00_setup.sql` to create and load the Bronze tables.
+Run **Sections 3-5** of [`sql/00_setup.sql`](sql/00_setup.sql) to create the Bronze tables, load the CSVs, and verify row counts.
 
-### 4. Run the workshop
+### Run the Workshop
 
-Open CoCo and follow the prompts in [WORKSHOP_PROMPT_GUIDE.md](WORKSHOP_PROMPT_GUIDE.md).
+Open CoCo and follow the prompts in [`WORKSHOP_PROMPT_GUIDE.md`](WORKSHOP_PROMPT_GUIDE.md).
 
 ## Reset Between Runs
 
@@ -78,13 +69,13 @@ Run `sql/99_teardown.sql` to drop everything except Bronze tables and stages, th
 ├── data/
 │   ├── suppliers.csv            # 12 rows — supplier master data (with quality issues)
 │   ├── parts.csv                # 25,000 rows — 5 part types with JSON BOM
-│   ├── warranty_claims.csv      # 500 rows — free-text complaints and tech notes
-│   └── docs/                    # 5 PDF parts service manuals
-│       ├── PM_TC-5000_Turbocharger_Assembly.pdf
-│       ├── PM_TCM-3200_Transmission_Control_Module.pdf
-│       ├── PM_EXM-4100_Exhaust_Manifold_Assembly.pdf
-│       ├── PM_ACM-2800_Air_Compressor_Assembly.pdf
-│       └── PM_SGB-6500_Steering_Gear_Box.pdf
+│   └── warranty_claims.csv      # 500 rows — free-text complaints and tech notes
+├── docs/                        # 5 PDF parts service manuals
+│   ├── PM_TC-5000_Turbocharger_Assembly.pdf
+│   ├── PM_TCM-3200_Transmission_Control_Module.pdf
+│   ├── PM_EXM-4100_Exhaust_Manifold_Assembly.pdf
+│   ├── PM_ACM-2800_Air_Compressor_Assembly.pdf
+│   └── PM_SGB-6500_Steering_Gear_Box.pdf
 └── scripts/                     # Data generation scripts (optional, for regeneration)
     ├── generate_parts_data.py
     ├── generate_warranty_claims.py

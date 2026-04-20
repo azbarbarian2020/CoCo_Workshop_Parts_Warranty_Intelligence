@@ -10,7 +10,7 @@
 --        snow stage copy data/parts.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
 --        snow stage copy data/warranty_claims.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
 --   2. Upload PDF manuals:
---        snow stage copy data/docs/PM_*.pdf @COCO_WORKSHOP.BRONZE.DOCS --overwrite
+--        snow stage copy docs/PM_*.pdf @COCO_WORKSHOP.BRONZE.DOCS --overwrite
 --   3. Then run this script to create tables and load data.
 --
 -- NOTE: The stage CREATE statements must run first so the stages exist before
