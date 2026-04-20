@@ -231,7 +231,7 @@ Using AI_CLASSIFY with task_description 'Identify which single sub-component cau
 **PROMPT**:
 
 ```
-$semantic-view Create a semantic view called COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS over COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS, COCO_WORKSHOP.GOLD.PARTS, and COCO_WORKSHOP.GOLD.SUPPLIERS. WARRANTY_CLAIMS joins to PARTS on SERIAL_NUMBER and FAILED_SUB_PART = SUB_PART. PARTS joins to SUPPLIERS on SUPPLIER_ID. Include a UNIT_COUNT metric as COUNT(DISTINCT PARTS.SERIAL_NUMBER) for failure rate denominators — failure rate should be calculated as claim count divided by UNIT_COUNT. Add synonyms so 'vendor' maps to COMPANY_NAME and 'component' maps to SUB_PART. Use pure SQL DDL.
+$semantic-view Create a semantic view called COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS over COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS, COCO_WORKSHOP.GOLD.PARTS, and COCO_WORKSHOP.GOLD.SUPPLIERS. WARRANTY_CLAIMS joins to PARTS on SERIAL_NUMBER and FAILED_SUB_PART = SUB_PART. PARTS joins to SUPPLIERS on SUPPLIER_ID. Include a UNIT_COUNT metric as COUNT(DISTINCT PARTS.SERIAL_NUMBER) for failure rate denominators — failure rate should be calculated as claim count divided by UNIT_COUNT. Add synonyms so 'vendor' maps to COMPANY_NAME and 'component' maps to SUB_PART. Include an AI_SQL_GENERATION instruction: 'To calculate failure rate, compute UNIT_COUNT from PARTS in a separate CTE before joining to WARRANTY_CLAIMS. Failure rate = CLAIM_COUNT / UNIT_COUNT.' Use pure SQL DDL.
 ```
 
 > **Talk track**: "The semantic view is the bridge between natural language and SQL. I'm defining the table relationships, the metrics, and giving the AI hints about how to calculate failure rates. Notice I'm using pure SQL — no YAML files, no staging, just DDL."
