@@ -18,10 +18,19 @@
 -- ============================================================================
 
 -- ============================================================================
--- 1. DATABASE, SCHEMAS
+-- 1. DATABASE, SCHEMAS, WAREHOUSE
 -- ============================================================================
 CREATE DATABASE IF NOT EXISTS COCO_WORKSHOP;
 USE DATABASE COCO_WORKSHOP;
+
+CREATE WAREHOUSE IF NOT EXISTS COCO_WORKSHOP_WH
+  GENERATION = '2'
+  WAREHOUSE_SIZE = 'MEDIUM'
+  AUTO_SUSPEND = 60
+  AUTO_RESUME = TRUE
+  INITIALLY_SUSPENDED = TRUE
+  COMMENT = 'CoCo Workshop: Parts Warranty Intelligence';
+USE WAREHOUSE COCO_WORKSHOP_WH;
 
 CREATE SCHEMA IF NOT EXISTS BRONZE;
 CREATE SCHEMA IF NOT EXISTS SILVER;

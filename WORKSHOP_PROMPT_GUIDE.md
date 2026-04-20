@@ -6,7 +6,7 @@
 **Platform**: Cortex Code (CoCo)
 **Database**: COCO_WORKSHOP
 **Schemas**: BRONZE, SILVER, GOLD
-**Warehouse**: SNOW_INTELLIGENCE_DEMO_WH
+**Warehouse**: COCO_WORKSHOP_WH (Gen2 Medium)
 
 ---
 
@@ -227,7 +227,7 @@ $semantic-view Create a semantic view called COCO_WORKSHOP.GOLD.WARRANTY_ANALYTI
 **PROMPT**:
 
 ```
-Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH over the PDF files in the @COCO_WORKSHOP.BRONZE.DOCS stage. Use warehouse SNOW_INTELLIGENCE_DEMO_WH. First parse and chunk the PDFs into a table called COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS, then create the search service in the GOLD schema on top of it.
+Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH over the PDF files in the @COCO_WORKSHOP.BRONZE.DOCS stage. Use warehouse COCO_WORKSHOP_WH. First parse and chunk the PDFs into a table called COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS, then create the search service in the GOLD schema on top of it.
 ```
 
 > **Talk track**: "We have 5 PDF parts manuals sitting on a Snowflake stage. With one prompt, CoCo parses the PDFs, chunks the text, and creates a searchable index. Now the AI can answer questions like 'what's the torque spec for a turbocharger mounting bolt?' directly from the source documents."
@@ -246,7 +246,7 @@ Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH ove
 Create a Cortex Agent called COCO_WORKSHOP.GOLD.WARRANTY_AGENT that combines:
 1. The COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH Cortex Search Service for looking up parts manual specs and procedures
 2. The COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS semantic view for querying warranty claims, parts, and supplier data
-Use warehouse SNOW_INTELLIGENCE_DEMO_WH.
+Use warehouse COCO_WORKSHOP_WH.
 ```
 
 > **Talk track**: "One prompt. We just built an AI agent that combines structured data analytics with unstructured document search. No API integration, no RAG framework, no vector database plumbing — just declare what tools the agent has and Snowflake handles the orchestration."

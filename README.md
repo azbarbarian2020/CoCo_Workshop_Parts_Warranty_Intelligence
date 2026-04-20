@@ -21,7 +21,7 @@ Three data stories are embedded for the agent to discover:
 - Snowflake account with `ACCOUNTADMIN` role (or equivalent)
 - [Cortex Code (CoCo)](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code) access
 - [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) installed and configured
-- A warehouse (the guide uses `SNOW_INTELLIGENCE_DEMO_WH` — change to yours)
+- A warehouse — the setup script creates `COCO_WORKSHOP_WH` (Gen2 Medium) automatically
 
 ## Quick Start
 
@@ -33,6 +33,10 @@ Run **Sections 1-2** of `sql/00_setup.sql` in Snowflake to create the database, 
 -- Run in Snowflake worksheet or Snow CLI
 CREATE DATABASE IF NOT EXISTS COCO_WORKSHOP;
 USE DATABASE COCO_WORKSHOP;
+CREATE WAREHOUSE IF NOT EXISTS COCO_WORKSHOP_WH
+  GENERATION = '2' WAREHOUSE_SIZE = 'MEDIUM'
+  AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = TRUE;
+USE WAREHOUSE COCO_WORKSHOP_WH;
 CREATE SCHEMA IF NOT EXISTS BRONZE;
 CREATE SCHEMA IF NOT EXISTS SILVER;
 CREATE SCHEMA IF NOT EXISTS GOLD;
@@ -86,10 +90,6 @@ Run `sql/99_teardown.sql` to drop everything except Bronze tables and stages, th
     ├── generate_warranty_claims.py
     └── generate_part_manuals.py
 ```
-
-## Warehouse Note
-
-The workshop guide references `SNOW_INTELLIGENCE_DEMO_WH`. Replace with your warehouse name in CoCo prompts if needed.
 
 ## Regenerating Data (Optional)
 
