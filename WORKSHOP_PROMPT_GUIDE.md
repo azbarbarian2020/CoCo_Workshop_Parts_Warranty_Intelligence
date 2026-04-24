@@ -293,6 +293,16 @@ Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped i
 
 > **What it shows**: Three-table join, UNIT_COUNT-based failure rate calculation. All three stories surface immediately — VGT Actuator from Precision Dynamics at the top, Main PCB from NovaTech, and Piston and Cylinder Kit spread across all vendors at similar rates.
 
+> **Expected results**: The top 5 should be: TCM-3200 Main PCB / Novatech (3.07%), TC-5000 VGT Actuator / Precision Dynamics (2.58%), then three ACM-2800 Piston and Cylinder Kit rows from Midwest Pneumatics (1.16%), Heartland Steel (1.15%), and Great Lakes (0.93%). If Unit Count shows ~1 per row instead of thousands, the agent is computing units within the claims join instead of from the full PARTS table.
+
+> **If results don't match** — add a Verified Query to anchor the failure rate calculation:
+>
+> ```
+> $semantic-view Add a verified query to COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS for the question "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order". The verified SQL should compute UNIT_COUNT as COUNT(DISTINCT PARTS.SERIAL_NUMBER) grouped by PARTS.PART_NUMBER and PARTS.SUB_PART in a CTE, then count claims from WARRANTY_CLAIMS grouped by PART_NUMBER, FAILED_SUB_PART joined to PARTS and SUPPLIERS for COMPANY_NAME, then join to the UNIT_COUNT CTE on part_number and sub_part, calculate failure_rate as claim_count / unit_count, and ORDER BY failure_rate DESC LIMIT 5. The verified query ensures the three embedded data stories surface correctly: VGT Actuator (bad batch from Precision Dynamics), Main PCB (bad supplier NovaTech), and Piston and Cylinder Kit (design problem — similar rates across all 3 vendors: Midwest Pneumatics, Great Lakes, Heartland Steel).
+> ```
+>
+> Then re-ask Q2. The VQR gives Cortex Analyst a reference SQL pattern for failure rate queries.
+
 ### Q3: Root Cause Analysis (Bad Supplier vs Bad Batch)
 
 ```
@@ -354,6 +364,7 @@ What are possible cascading effects of a Main PCB going out in a TCM-3200?
 | COMPLETE returns malformed output | Specify the model explicitly: `SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b', prompt)` |
 | Semantic view has 0 metrics | Use `metrics` with full aggregate expressions (e.g., `COUNT(TABLE.COL)`), not `measures` or `default_aggregation` |
 | Agent spec "unrecognized field" | Use `tool_spec.type/name/description` format, NOT `tool_type/tool_name`. `tool_resources` is top-level keyed by tool name. |
+| Agent error "Analyst tool is missing an execution environment" | The semantic view tool needs a warehouse. Fix in Snowsight: Edit the agent → find the WarrantyAnalytics tool → add warehouse `COCO_WORKSHOP_WH` in the tool's execution settings. |
 
 ---
 
