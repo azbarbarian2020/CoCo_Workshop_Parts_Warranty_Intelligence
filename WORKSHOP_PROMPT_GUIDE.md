@@ -306,7 +306,7 @@ Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped i
 ### Q3: Root Cause Analysis (Bad Supplier vs Bad Batch)
 
 ```
-Analyze the failure rates for the Main PCB and VGT Actuator to determine if the majority of failures appear to be a vendor issue or batch issue and why
+Evaluate failures for Main PCB and VGT Actuator sub parts down to the vendor and batch level to determine if the issues appear to be more of a vendor problem or a batch problem.
 ```
 
 > **What it shows**: The money question. The agent must reason about two different failure patterns:
