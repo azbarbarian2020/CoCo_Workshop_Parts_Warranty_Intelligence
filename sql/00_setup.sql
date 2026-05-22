@@ -4,17 +4,10 @@
 -- The audience never sees this script.
 -- ============================================================================
 --
--- BEFORE RUNNING THIS SCRIPT:
---   1. Upload CSV files to stages using Snow CLI:
---        snow stage copy data/suppliers.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
---        snow stage copy data/parts.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
---        snow stage copy data/warranty_claims.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
---   2. Upload PDF manuals:
---        snow stage copy docs/PM_*.pdf @COCO_WORKSHOP.BRONZE.DOCS --overwrite
---   3. Then run this script to create tables and load data.
+-- This script is SELF-CONTAINED. It pulls data and docs directly from GitHub
+-- using Snowflake's Git Repository integration — no manual file uploads needed.
 --
--- NOTE: The stage CREATE statements must run first so the stages exist before
--- you upload files. Run Sections 1-2 first, upload files, then run Sections 3-5.
+-- Source repo: https://github.com/azbarbarian2020/CoCo_Workshop_Parts_Warranty_Intelligence
 -- ============================================================================
 
 -- ============================================================================
@@ -46,7 +39,38 @@ CREATE STAGE IF NOT EXISTS BRONZE.DOCS
   ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE');
 
 -- ============================================================================
--- 3. BRONZE TABLES
+-- 3. GIT REPOSITORY INTEGRATION (pulls data/docs from GitHub)
+-- ============================================================================
+CREATE OR REPLACE API INTEGRATION GIT_API_INTEGRATION_COCO
+  API_PROVIDER = GIT_HTTPS_API
+  API_ALLOWED_PREFIXES = ('https://github.com/azbarbarian2020/')
+  ENABLED = TRUE;
+
+CREATE OR REPLACE GIT REPOSITORY BRONZE.WORKSHOP_REPO
+  API_INTEGRATION = GIT_API_INTEGRATION_COCO
+  ORIGIN = 'https://github.com/azbarbarian2020/CoCo_Workshop_Parts_Warranty_Intelligence.git';
+
+ALTER GIT REPOSITORY BRONZE.WORKSHOP_REPO FETCH;
+
+-- ============================================================================
+-- 4. COPY FILES FROM GIT REPO TO STAGES
+-- ============================================================================
+COPY FILES
+  INTO @BRONZE.DATA_STAGE
+  FROM @BRONZE.WORKSHOP_REPO/branches/main/data/
+  FILES = ('suppliers.csv', 'parts.csv', 'warranty_claims.csv');
+
+COPY FILES
+  INTO @BRONZE.DOCS
+  FROM @BRONZE.WORKSHOP_REPO/branches/main/docs/
+  FILES = ('PM_TC-5000_Turbocharger_Assembly.pdf',
+           'PM_TCM-3200_Transmission_Control_Module.pdf',
+           'PM_EXM-4100_Exhaust_Manifold_Assembly.pdf',
+           'PM_ACM-2800_Air_Compressor_Assembly.pdf',
+           'PM_SGB-6500_Steering_Gear_Box.pdf');
+
+-- ============================================================================
+-- 5. BRONZE TABLES
 -- ============================================================================
 CREATE OR REPLACE TABLE BRONZE.SUPPLIER_RAW (
     SUPPLIER_ID VARCHAR,
@@ -82,7 +106,7 @@ CREATE OR REPLACE TABLE BRONZE.WARRANTY_CLAIMS_RAW (
 );
 
 -- ============================================================================
--- 4. LOAD CSVs FROM STAGE
+-- 6. LOAD CSVs FROM STAGE
 -- ============================================================================
 COPY INTO BRONZE.SUPPLIER_RAW
 FROM @BRONZE.DATA_STAGE/suppliers.csv
@@ -100,7 +124,7 @@ FILE_FORMAT = (TYPE = CSV SKIP_HEADER = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"' EMP
 ON_ERROR = 'CONTINUE';
 
 -- ============================================================================
--- 5. REFRESH DOCS STAGE & VERIFY
+-- 7. REFRESH DOCS STAGE & VERIFY
 -- ============================================================================
 ALTER STAGE BRONZE.DOCS REFRESH;
 
