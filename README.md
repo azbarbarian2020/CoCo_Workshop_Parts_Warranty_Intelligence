@@ -20,37 +20,22 @@ Three data stories are embedded for the agent to discover:
 
 - Snowflake account with `ACCOUNTADMIN` role (or equivalent)
 - [Cortex Code (CoCo)](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code) access
-- [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) installed and configured (for Option B file upload)
 
 ## Quick Start
 
-### Phase 1: Create Infrastructure
+### Step 1: Run the Setup Script
 
-Run **Sections 1-2** of [`sql/00_setup.sql`](sql/00_setup.sql) in a Snowflake worksheet. This creates the database, warehouse, schemas, and stages.
+Run [`sql/00_setup.sql`](sql/00_setup.sql) in a Snowflake worksheet. The script is **fully self-contained** — it automatically:
 
-### Phase 2: Upload Files
+1. Creates the database (`COCO_WORKSHOP`), warehouse, and schemas (Bronze/Silver/Gold)
+2. Creates a Git Repository integration pointing to this repo
+3. Copies the 3 CSV data files and 5 PDF manuals from GitHub directly into Snowflake stages
+4. Creates Bronze tables and loads the CSVs
+5. Verifies row counts and docs stage contents
 
-Upload the CSV data files and PDF manuals to the stages created in Phase 1.
+No manual file uploads or Snow CLI required.
 
-**Option A — Snowsight UI (no CLI required)**
-
-1. Download the 3 CSV files from the [`data/`](data/) folder and the 5 PDF files from the [`docs/`](docs/) folder in this repo
-2. In Snowsight, navigate to **Data** > **Databases** > **COCO_WORKSHOP** > **BRONZE**
-3. Upload the 3 CSVs to the `DATA_STAGE` stage
-4. Upload the 5 PDFs to the `DOCS` stage
-
-**Option B — Snow CLI (from cloned repo)**
-
-```bash
-snow stage copy data/*.csv @COCO_WORKSHOP.BRONZE.DATA_STAGE --overwrite
-snow stage copy docs/PM_*.pdf @COCO_WORKSHOP.BRONZE.DOCS --overwrite
-```
-
-### Phase 3: Load Bronze Tables
-
-Run **Sections 3-5** of [`sql/00_setup.sql`](sql/00_setup.sql) to create the Bronze tables, load the CSVs, and verify row counts.
-
-### Run the Workshop
+### Step 2: Run the Workshop
 
 Open CoCo and follow the prompts in [`WORKSHOP_PROMPT_GUIDE.md`](WORKSHOP_PROMPT_GUIDE.md).
 
@@ -64,7 +49,7 @@ Run `sql/99_teardown.sql` to drop everything except Bronze tables and stages, th
 ├── README.md                    # This file
 ├── WORKSHOP_PROMPT_GUIDE.md     # Step-by-step prompt guide and talk track
 ├── sql/
-│   ├── 00_setup.sql             # Create DB, schemas, stages, load Bronze
+│   ├── 00_setup.sql             # Create DB, schemas, stages, load Bronze (self-contained)
 │   └── 99_teardown.sql          # Reset for re-demo (preserves Bronze)
 ├── data/
 │   ├── suppliers.csv            # 12 rows — supplier master data (with quality issues)
