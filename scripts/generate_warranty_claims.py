@@ -465,7 +465,7 @@ TECH_NOTES_TEMPLATES = {
 CLAIM_DIST = {
     "TC-5000": 150,
     "TCM-3200": 120,
-    "ACM-2800": 100,
+    "ACM-2800": 200,
     "EXM-4100": 70,
     "SGB-6500": 60,
 }
@@ -478,14 +478,14 @@ BAD_BATCH_CLAIM_RATES = {
 SUB_PART_WEIGHTS_BAD_BATCH = {
     "TC-5000":  {"VGT Actuator": 50, "VGT Actuator_cascade": 8, "Turbine Wheel": 12, "Bearing Housing": 10, "Compressor Wheel": 7, "Wastegate Valve": 6, "Oil Feed Line": 4, "Heat Shield": 3},
     "TCM-3200": {"Main PCB": 48, "Main PCB_cascade": 8, "Solenoid Pack": 12, "Wiring Harness": 10, "Connector Housing": 8, "Pressure Transducer": 6, "Temperature Sensor": 4, "Firmware Chip": 4},
-    "ACM-2800": {"Piston and Cylinder Kit": 45, "Piston and Cylinder Kit_cascade": 8, "Governor": 13, "Compressor Head": 12, "Unloader Valve": 7, "Intake Filter": 5, "Discharge Line Assembly": 5, "Air Dryer Interface Gasket": 5},
+    "ACM-2800": {"Piston and Cylinder Kit": 65, "Piston and Cylinder Kit_cascade": 12, "Governor": 8, "Compressor Head": 7, "Unloader Valve": 4, "Intake Filter": 3, "Discharge Line Assembly": 3, "Air Dryer Interface Gasket": 3},
 }
 
 SUB_PART_WEIGHTS_NORMAL = {
     "TC-5000":  {"VGT Actuator": 8, "Turbine Wheel": 20, "Bearing Housing": 18, "Compressor Wheel": 16, "Wastegate Valve": 15, "Oil Feed Line": 12, "Heat Shield": 11},
     "TCM-3200": {"Main PCB": 8, "Solenoid Pack": 20, "Wiring Harness": 16, "Connector Housing": 15, "Pressure Transducer": 15, "Temperature Sensor": 14, "Firmware Chip": 12},
     "EXM-4100": {"Heat Shield": 18, "Heat Shield_cascade": 4, "Gasket Set": 20, "Manifold Casting": 16, "EGR Port Insert": 13, "Mounting Stud Kit": 11, "Expansion Joint": 10, "Pyrometer Boss": 8},
-    "ACM-2800": {"Piston and Cylinder Kit": 40, "Piston and Cylinder Kit_cascade": 8, "Governor": 13, "Compressor Head": 12, "Unloader Valve": 8, "Intake Filter": 6, "Discharge Line Assembly": 7, "Air Dryer Interface Gasket": 6},
+    "ACM-2800": {"Piston and Cylinder Kit": 60, "Piston and Cylinder Kit_cascade": 12, "Governor": 8, "Compressor Head": 7, "Unloader Valve": 5, "Intake Filter": 4, "Discharge Line Assembly": 4, "Air Dryer Interface Gasket": 4},
     "SGB-6500": {"Sector Shaft": 18, "Sector Shaft_cascade": 4, "Piston and Rack Assembly": 20, "Input Shaft Seal": 18, "Housing Casting": 16, "Spool Valve": 10, "Hydraulic Fitting Set": 8, "Pitman Arm": 6},
 }
 

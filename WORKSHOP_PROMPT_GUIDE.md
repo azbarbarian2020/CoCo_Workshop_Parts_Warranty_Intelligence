@@ -28,7 +28,7 @@ BRONZE (Raw)                    SILVER (Enriched)              GOLD (Analytics-R
 +-----------------+   AI_SUMMARIZE  +--------------------+            |
 | WARRANTY_CLAIMS |──────────────▶| COMPLAINT_SUMMARIES  |            |
 | _RAW            |   AI_COMPLETE  +--------------------+            |
-| (500 rows)      |──────────────▶| SYMPTOM_CATEGORIES   |            |
+| (600 rows)      |──────────────▶| SYMPTOM_CATEGORIES   |            |
 |                 |   AI_CLASSIFY  +--------------------+            |
 |                 |──────────────▶| WARRANTY_CLAIMS      |   AI_CLASSIFY   +------------------+
 |                 |               | (+symptom_category)  |──────────────▶| WARRANTY_CLAIMS  |
@@ -68,7 +68,7 @@ BRONZE (Raw)                    SILVER (Enriched)              GOLD (Analytics-R
 |-------|------|-------------|
 | SUPPLIER_RAW | 12 | Supplier master data with data quality issues (inconsistent casing, state formats, extra spaces, duplicates) |
 | PARTS_RAW | 25,000 | 5 part types x 5,000 serial numbers. BOM column is a JSON array of sub-parts with supplier_id and batch_id |
-| WARRANTY_CLAIMS_RAW | 500 | Raw warranty claims with free-text customer_complaint and technician_notes |
+| WARRANTY_CLAIMS_RAW | 600 | Raw warranty claims with free-text customer_complaint and technician_notes |
 | @BRONZE.DOCS | 5 PDFs | Parts service manuals (one per part type), directory enabled |
 
 ---
@@ -79,9 +79,9 @@ Three distinct failure patterns are embedded for discovery during the demo:
 
 | Story | Sub-Part | Pattern | What You Find |
 |-------|----------|---------|---------------|
-| **Bad Batch** | VGT Actuator | Three suppliers (Precision Dynamics 40%, Allied Turbo 35%, ThermalTech 25%). Precision Dynamics batch B-2024-PD-VA-07 has 5.7% failure rate vs <1.3% for all other batches. | Isolate the batch, issue a recall. |
-| **Bad Supplier** | Main PCB | Three suppliers (NovaTech 40%, Berg Elektronik 35%, Precision Dynamics 25%). NovaTech: 3.07% failure rate. Others: 0-0.23%. | Switch suppliers or escalate quality audit. |
-| **Design Problem** | Piston and Cylinder Kit | Three suppliers (Midwest Pneumatics 40%, Great Lakes 35%, Heartland Steel 25%). All fail at similar rates (0.93-1.16%). | Not a supplier or batch issue — redesign needed. |
+| **Bad Batch** | VGT Actuator | Three suppliers (Precision Dynamics 40%, Allied Turbo 35%, ThermalTech 25%). Precision Dynamics batch B-2024-PD-VA-07 has elevated failure rate vs other batches. | Isolate the batch, issue a recall. |
+| **Bad Supplier** | Main PCB | Three suppliers (NovaTech 40%, Berg Elektronik 35%, Precision Dynamics 25%). NovaTech has significantly elevated failure rate. Others near zero. | Switch suppliers or escalate quality audit. |
+| **Design Problem** | Piston and Cylinder Kit | Three suppliers (Midwest Pneumatics 40%, Great Lakes 35%, Heartland Steel 25%). All fail at similar elevated rates (2-4%). | Not a supplier or batch issue — redesign needed. |
 
 ---
 
@@ -146,7 +146,7 @@ Flatten the BOM JSON array in COCO_WORKSHOP.BRONZE.PARTS_RAW into a new table CO
 
 ### Step 3: Summarize Complaints by Part
 
-**WHY**: We have 500 warranty claims with free-text customer complaints. Before we can classify them, we need to understand what kinds of complaints exist for each part type. AI_SUMMARIZE_AGG condenses hundreds of complaints per part into a single summary paragraph — giving us a high-level view of failure patterns.
+**WHY**: We have 600 warranty claims with free-text customer complaints. Before we can classify them, we need to understand what kinds of complaints exist for each part type. AI_SUMMARIZE_AGG condenses hundreds of complaints per part into a single summary paragraph — giving us a high-level view of failure patterns.
 
 **PROMPT**:
 
@@ -154,7 +154,7 @@ Flatten the BOM JSON array in COCO_WORKSHOP.BRONZE.PARTS_RAW into a new table CO
 Summarize all customer_complaint values in COCO_WORKSHOP.BRONZE.WARRANTY_CLAIMS_RAW grouped by part_number using AI_SUMMARIZE_AGG. Save to COCO_WORKSHOP.SILVER.COMPLAINT_SUMMARIES.
 ```
 
-> **Talk track**: "We have 500 free-text complaints. Instead of reading them all, I'll ask Snowflake's built-in AI to summarize them by part type. One SQL function call — no external API, no tokens to manage."
+> **Talk track**: "We have 600 free-text complaints. Instead of reading them all, I'll ask Snowflake's built-in AI to summarize them by part type. One SQL function call — no external API, no tokens to manage."
 
 **RESULT**: SILVER.COMPLAINT_SUMMARIES — 5 rows (one per part type), each with a paragraph summarizing the common complaint themes.
 
@@ -188,7 +188,7 @@ Using COMPLETE with llama3.1-70b, compare these categories against the summaries
 
 ### Step 5: Classify Complaints by Symptom
 
-**WHY**: Now we tag each of the 500 warranty claims with one of our 10 symptom categories. This turns unstructured text into a filterable, groupable dimension. AI_CLASSIFY is Snowflake's built-in classification function — it reads the text and picks the best matching label from a provided list.
+**WHY**: Now we tag each of the 600 warranty claims with one of our 10 symptom categories. This turns unstructured text into a filterable, groupable dimension. AI_CLASSIFY is Snowflake's built-in classification function — it reads the text and picks the best matching label from a provided list.
 
 **PROMPT**:
 
@@ -196,11 +196,11 @@ Using COMPLETE with llama3.1-70b, compare these categories against the summaries
 Using AI_CLASSIFY with task_description 'Classify the truck driver warranty complaint into the primary symptom category', classify each customer_complaint in COCO_WORKSHOP.BRONZE.WARRANTY_CLAIMS_RAW using the categories from COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES. Save as COCO_WORKSHOP.SILVER.WARRANTY_CLAIMS with all original columns plus a symptom_category column.
 ```
 
-> **Talk track**: "AI_CLASSIFY reads each complaint and assigns the best-matching symptom category. No training data, no fine-tuning — it just works."
+> **Talk track**: "AI_CLASSIFY reads each complaint and assigns the best-matching symptom category. No training data, no fine-tuning — it just works. 600 claims classified in about a minute."
 
-**TIMING**: ~1-3 minutes. AI_CLASSIFY makes one LLM inference call per row (500 calls). Execution time varies by region and Cortex AI load.
+**TIMING**: ~1-3 minutes. AI_CLASSIFY makes one LLM inference call per row (600 calls). Execution time varies by region and Cortex AI load.
 
-**RESULT**: SILVER.WARRANTY_CLAIMS — 500 rows, all original columns + SYMPTOM_CATEGORY.
+**RESULT**: SILVER.WARRANTY_CLAIMS — 600 rows, all original columns + SYMPTOM_CATEGORY.
 
 ---
 
@@ -216,9 +216,9 @@ Using AI_CLASSIFY with task_description 'Identify which single sub-component cau
 
 > **Talk track**: "This is the magic moment. The AI reads each technician's repair notes and figures out which sub-component actually failed. It uses the parts BOM as the category list — so for a turbocharger claim, it chooses from VGT Actuator, Compressor Wheel, Bearing Housing, etc. Now we can trace failures back to specific suppliers and batches."
 
-**TIMING**: ~2-5 minutes. This is the longest-running step — each of the 500 claims requires an AI_CLASSIFY call with a correlated subquery to look up the sub-parts for that claim's part type. Let it run.
+**TIMING**: ~2-5 minutes. This is the longest-running step — each of the 600 claims requires an AI_CLASSIFY call with a correlated subquery. Let it run.
 
-**RESULT**: GOLD.WARRANTY_CLAIMS — 500 rows, all columns + FAILED_SUB_PART. This is the final claims table.
+**RESULT**: GOLD.WARRANTY_CLAIMS — 600 rows, all columns + FAILED_SUB_PART. This is the final claims table.
 
 ---
 
@@ -237,6 +237,56 @@ $semantic-view Create a semantic view called COCO_WORKSHOP.GOLD.WARRANTY_ANALYTI
 > **Talk track**: "The semantic view is the bridge between natural language and SQL. I'm defining the table relationships, the metrics, and giving the AI hints about how to calculate failure rates. Notice I'm using pure SQL — no YAML files, no staging, just DDL."
 
 **RESULT**: Semantic view COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS with 3 tables, 2 relationships, metrics + dimensions.
+
+### Step 7b: Add a Verified Query (Failure Rate Fix)
+
+**WHY**: Cortex Analyst can non-deterministically generate incorrect failure rate SQL — computing UNIT_COUNT only from claimed units (giving 100% rates) instead of from all deployed units. A Verified Query (VQR) forces the correct SQL pattern when this specific question is asked.
+
+**PROMPT** (use this first — natural flow for the demo):
+
+```
+$semantic-view Add a verified query to COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS for the question "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order". The verified SQL should compute UNIT_COUNT as COUNT(DISTINCT PARTS.SERIAL_NUMBER) grouped by PARTS.PART_NUMBER and PARTS.SUB_PART in a CTE, then count claims from WARRANTY_CLAIMS grouped by PART_NUMBER, FAILED_SUB_PART joined to PARTS and SUPPLIERS for COMPANY_NAME, then join to the UNIT_COUNT CTE on part_number and sub_part, calculate failure_rate as claim_count / unit_count, and ORDER BY failure_rate DESC LIMIT 5. The verified query ensures the three embedded data stories surface correctly: VGT Actuator (bad batch from Precision Dynamics), Main PCB (bad supplier NovaTech), and Piston and Cylinder Kit (design problem — similar rates across all 3 vendors: Midwest Pneumatics, Great Lakes, Heartland Steel).
+```
+
+> **Talk track**: "Verified queries are a safety net. They guarantee that when someone asks this exact question, the analyst uses our validated SQL — no hallucinated joins, no wrong denominators."
+
+**VERIFY**: After CoCo recreates the semantic view with the VQR, test Q2. You should see VGT Actuator and Main PCB in the top results with failure rates between 1-6%, NOT 100%.
+
+**FALLBACK** — If Q2 still shows 100% failure rates, CoCo generated the wrong SQL in the VQR. Use this prompt with the exact SQL provided:
+
+```
+Add a verified query to the COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS semantic view for this question: "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order"
+
+The SQL must compute UNIT_COUNT in a separate CTE from COCO_WORKSHOP.GOLD.PARTS (grouping by PART_NUMBER and SUB_PART) BEFORE joining to WARRANTY_CLAIMS. This is critical — do NOT compute unit counts from the claims join or you'll get 100% failure rates. Here is the correct SQL:
+
+WITH unit_counts AS (
+  SELECT PART_NUMBER, SUB_PART, COUNT(DISTINCT SERIAL_NUMBER) AS UNIT_COUNT
+  FROM COCO_WORKSHOP.GOLD.PARTS
+  GROUP BY PART_NUMBER, SUB_PART
+),
+claim_counts AS (
+  SELECT wc.PART_NUMBER, wc.FAILED_SUB_PART, s.COMPANY_NAME,
+         COUNT(wc.CLAIM_ID) AS CLAIM_COUNT
+  FROM COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS wc
+  JOIN COCO_WORKSHOP.GOLD.PARTS p
+    ON wc.SERIAL_NUMBER = p.SERIAL_NUMBER AND wc.FAILED_SUB_PART = p.SUB_PART
+  JOIN COCO_WORKSHOP.GOLD.SUPPLIERS s ON p.SUPPLIER_ID = s.SUPPLIER_ID
+  GROUP BY wc.PART_NUMBER, wc.FAILED_SUB_PART, s.COMPANY_NAME
+)
+SELECT cc.PART_NUMBER, cc.FAILED_SUB_PART AS SUB_PART, cc.COMPANY_NAME AS VENDOR,
+       cc.CLAIM_COUNT, uc.UNIT_COUNT,
+       ROUND(cc.CLAIM_COUNT / uc.UNIT_COUNT, 6) AS FAILURE_RATE
+FROM claim_counts cc
+JOIN unit_counts uc ON cc.PART_NUMBER = uc.PART_NUMBER AND cc.FAILED_SUB_PART = uc.SUB_PART
+ORDER BY FAILURE_RATE DESC
+LIMIT 5
+```
+
+**IF VQR STILL DOESN'T FIRE**: Ask CoCo `Show me the DDL for COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS` and verify the AI_VERIFIED_QUERIES section exists with the correct SQL.
+
+**RESULT**: Semantic view now has a verified query ensuring correct failure rate calculation.
+
+---
 
 ### Step 8: Create Cortex Search Service
 
@@ -328,7 +378,7 @@ What are possible cascading effects of a Main PCB going out in a TCM-3200?
 
 | Function | What It Does | Where We Use It |
 |----------|-------------|-----------------|
-| **AI_SUMMARIZE_AGG** | Aggregates and summarizes multiple text values into one paragraph | Step 3: Summarize 500 complaints into 5 part-level summaries |
+| **AI_SUMMARIZE_AGG** | Aggregates and summarizes multiple text values into one paragraph | Step 3: Summarize 600 complaints into 5 part-level summaries |
 | **COMPLETE** (llama3.1-70b) | General-purpose LLM for text generation and reasoning | Step 4b: Select 10 best symptom categories from 20 candidates |
 | **AI_CLASSIFY** | Classifies text into one of N provided categories | Step 5: Tag complaints with symptom categories. Step 6: Identify failed sub-parts from technician notes. |
 | **PARSE_DOCUMENT** | Extracts text content from PDF/image files on a stage | Step 8: Parse parts manual PDFs into searchable text chunks |

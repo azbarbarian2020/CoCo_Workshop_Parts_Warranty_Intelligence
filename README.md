@@ -54,7 +54,7 @@ Run `sql/99_teardown.sql` to drop everything except Bronze tables and stages, th
 ├── data/
 │   ├── suppliers.csv            # 12 rows — supplier master data (with quality issues)
 │   ├── parts.csv                # 25,000 rows — 5 part types with JSON BOM
-│   └── warranty_claims.csv      # 500 rows — free-text complaints and tech notes
+│   ├── warranty_claims.csv      # 600 rows — free-text complaints and tech notes
 ├── docs/                        # 5 PDF parts service manuals
 │   ├── PM_TC-5000_Turbocharger_Assembly.pdf
 │   ├── PM_TCM-3200_Transmission_Control_Module.pdf
