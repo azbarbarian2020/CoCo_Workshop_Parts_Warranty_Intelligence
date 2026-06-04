@@ -471,8 +471,8 @@ CLAIM_DIST = {
 }
 
 BAD_BATCH_CLAIM_RATES = {
-    "TC-5000":  0.55,
-    "TCM-3200": 0.75,
+    "TC-5000":  0.60,
+    "TCM-3200": 0.70,
 }
 
 SUB_PART_WEIGHTS_BAD_BATCH = {
