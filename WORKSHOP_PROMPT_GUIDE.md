@@ -231,60 +231,12 @@ Using AI_CLASSIFY with task_description 'Identify which single sub-component cau
 **PROMPT**:
 
 ```
-$semantic-view Create a semantic view called COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS over COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS, COCO_WORKSHOP.GOLD.PARTS, and COCO_WORKSHOP.GOLD.SUPPLIERS. WARRANTY_CLAIMS joins to PARTS on SERIAL_NUMBER and FAILED_SUB_PART = SUB_PART. PARTS joins to SUPPLIERS on SUPPLIER_ID. Include a UNIT_COUNT metric as COUNT(DISTINCT PARTS.SERIAL_NUMBER) for failure rate denominators — failure rate should be calculated as claim count divided by UNIT_COUNT. Add synonyms so 'vendor' maps to COMPANY_NAME and 'component' maps to SUB_PART. Include an AI_SQL_GENERATION instruction: 'To calculate failure rate, compute UNIT_COUNT from PARTS in a separate CTE before joining to WARRANTY_CLAIMS. Failure rate = CLAIM_COUNT / UNIT_COUNT.' Use pure SQL DDL.
+/semantic_studio Create a semantic view called COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS over COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS, COCO_WORKSHOP.GOLD.PARTS, and COCO_WORKSHOP.GOLD.SUPPLIERS. WARRANTY_CLAIMS joins to PARTS on SERIAL_NUMBER and FAILED_SUB_PART = SUB_PART. PARTS joins to SUPPLIERS on SUPPLIER_ID. Include PART_NUMBER as a dimension on both WARRANTY_CLAIMS and PARTS tables. Include a UNIT_COUNT metric as COUNT(DISTINCT PARTS.SERIAL_NUMBER) for failure rate denominators — failure rate should be calculated as claim count divided by UNIT_COUNT. Add synonyms so 'vendor' maps to COMPANY_NAME and 'component' maps to SUB_PART. Use pure SQL DDL.
 ```
 
 > **Talk track**: "The semantic view is the bridge between natural language and SQL. I'm defining the table relationships, the metrics, and giving the AI hints about how to calculate failure rates. Notice I'm using pure SQL — no YAML files, no staging, just DDL."
 
-**RESULT**: Semantic view COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS with 3 tables, 2 relationships, metrics + dimensions.
-
-### Step 7b: Add a Verified Query (Failure Rate Fix)
-
-**WHY**: Cortex Analyst can non-deterministically generate incorrect failure rate SQL — computing UNIT_COUNT only from claimed units (giving 100% rates) instead of from all deployed units. A Verified Query (VQR) forces the correct SQL pattern when this specific question is asked.
-
-**PROMPT** (use this first — natural flow for the demo):
-
-```
-$semantic-view Add a verified query to COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS for the question "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order". The verified SQL should compute UNIT_COUNT as COUNT(DISTINCT PARTS.SERIAL_NUMBER) grouped by PARTS.PART_NUMBER and PARTS.SUB_PART in a CTE, then count claims from WARRANTY_CLAIMS grouped by PART_NUMBER, FAILED_SUB_PART joined to PARTS and SUPPLIERS for COMPANY_NAME, then join to the UNIT_COUNT CTE on part_number and sub_part, calculate failure_rate as claim_count / unit_count, and ORDER BY failure_rate DESC LIMIT 5. The verified query ensures the three embedded data stories surface correctly: VGT Actuator (bad batch from Precision Dynamics), Main PCB (bad supplier NovaTech), and Piston and Cylinder Kit (design problem — similar rates across all 3 vendors: Midwest Pneumatics, Great Lakes, Heartland Steel).
-```
-
-> **Talk track**: "Verified queries are a safety net. They guarantee that when someone asks this exact question, the analyst uses our validated SQL — no hallucinated joins, no wrong denominators."
-
-**VERIFY**: After CoCo recreates the semantic view with the VQR, test Q2. You should see VGT Actuator and Main PCB in the top results with failure rates between 1-6%, NOT 100%.
-
-**FALLBACK** — If Q2 still shows 100% failure rates, CoCo generated the wrong SQL in the VQR. Use this prompt with the exact SQL provided:
-
-```
-Add a verified query to the COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS semantic view for this question: "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order"
-
-The SQL must compute UNIT_COUNT in a separate CTE from COCO_WORKSHOP.GOLD.PARTS (grouping by PART_NUMBER and SUB_PART) BEFORE joining to WARRANTY_CLAIMS. This is critical — do NOT compute unit counts from the claims join or you'll get 100% failure rates. Here is the correct SQL:
-
-WITH unit_counts AS (
-  SELECT PART_NUMBER, SUB_PART, COUNT(DISTINCT SERIAL_NUMBER) AS UNIT_COUNT
-  FROM COCO_WORKSHOP.GOLD.PARTS
-  GROUP BY PART_NUMBER, SUB_PART
-),
-claim_counts AS (
-  SELECT wc.PART_NUMBER, wc.FAILED_SUB_PART, s.COMPANY_NAME,
-         COUNT(wc.CLAIM_ID) AS CLAIM_COUNT
-  FROM COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS wc
-  JOIN COCO_WORKSHOP.GOLD.PARTS p
-    ON wc.SERIAL_NUMBER = p.SERIAL_NUMBER AND wc.FAILED_SUB_PART = p.SUB_PART
-  JOIN COCO_WORKSHOP.GOLD.SUPPLIERS s ON p.SUPPLIER_ID = s.SUPPLIER_ID
-  GROUP BY wc.PART_NUMBER, wc.FAILED_SUB_PART, s.COMPANY_NAME
-)
-SELECT cc.PART_NUMBER, cc.FAILED_SUB_PART AS SUB_PART, cc.COMPANY_NAME AS VENDOR,
-       cc.CLAIM_COUNT, uc.UNIT_COUNT,
-       ROUND(cc.CLAIM_COUNT / uc.UNIT_COUNT, 6) AS FAILURE_RATE
-FROM claim_counts cc
-JOIN unit_counts uc ON cc.PART_NUMBER = uc.PART_NUMBER AND cc.FAILED_SUB_PART = uc.SUB_PART
-ORDER BY FAILURE_RATE DESC
-LIMIT 5
-```
-
-**IF VQR STILL DOESN'T FIRE**: Ask CoCo `Show me the DDL for COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS` and verify the AI_VERIFIED_QUERIES section exists with the correct SQL.
-
-**RESULT**: Semantic view now has a verified query ensuring correct failure rate calculation.
+**RESULT**: Semantic view COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS with 3 tables, 2 relationships, metrics + dimensions including PART_NUMBER on both tables.
 
 ---
 
@@ -292,13 +244,21 @@ LIMIT 5
 
 **WHY**: The Gold tables give us structured analytics, but technicians also need to look up specs, torque values, and troubleshooting procedures from the parts manuals. A Cortex Search Service indexes the 5 PDF manuals so the AI agent can answer document questions alongside data questions.
 
-**PROMPT**:
+**PROMPT 8a** (parse and chunk the PDFs):
 
 ```
-Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH over the PDF files in the @COCO_WORKSHOP.BRONZE.DOCS stage. Use warehouse COCO_WORKSHOP_WH. First parse and chunk the PDFs into a table called COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS, then create the search service in the GOLD schema on top of it.
+Parse the 5 PDF files from @COCO_WORKSHOP.BRONZE.DOCS using AI_PARSE_DOCUMENT and chunk the text into rows of ~500 tokens each. Save to COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS with columns: file_name, chunk_index, chunk_text. Use warehouse COCO_WORKSHOP_WH.
 ```
 
-> **Talk track**: "We have 5 PDF parts manuals sitting on a Snowflake stage. With one prompt, CoCo parses the PDFs, chunks the text, and creates a searchable index. Now the AI can answer questions like 'what's the torque spec for a turbocharger mounting bolt?' directly from the source documents."
+> **Talk track**: "We have 5 PDF parts manuals sitting on a Snowflake stage. CoCo parses them with AI_PARSE_DOCUMENT and chunks the text into searchable pieces."
+
+**PROMPT 8b** (create the search service):
+
+```
+Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH on the chunk_text column of COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS. Use warehouse COCO_WORKSHOP_WH.
+```
+
+> **Talk track**: "Now we point a Cortex Search Service at that table. The AI can answer questions like 'what's the torque spec for a turbocharger mounting bolt?' directly from the source documents."
 
 **RESULT**: BRONZE.DOCS_EMBEDDINGS (chunked text from 5 PDFs) and GOLD.PARTS_MANUAL_SEARCH (Cortex Search Service, active).
 
@@ -314,7 +274,7 @@ Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH ove
 Create a Cortex Agent called COCO_WORKSHOP.GOLD.WARRANTY_AGENT that combines:
 1. The COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH Cortex Search Service for looking up parts manual specs and procedures
 2. The COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS semantic view for querying warranty claims, parts, and supplier data
-Use warehouse COCO_WORKSHOP_WH.
+Use warehouse COCO_WORKSHOP_WH. In the agent instructions, specify that all questions about failure rates, claims, parts, suppliers, or warranty data must be answered using the WARRANTY_ANALYTICS semantic view tool — never generate SQL directly.
 ```
 
 > **Talk track**: "One prompt. We just built an AI agent that combines structured data analytics with unstructured document search. No API integration, no RAG framework, no vector database plumbing — just declare what tools the agent has and Snowflake handles the orchestration."
@@ -343,12 +303,12 @@ Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped i
 
 > **What it shows**: Three-table join, UNIT_COUNT-based failure rate calculation. All three stories surface immediately — VGT Actuator from Precision Dynamics at the top, Main PCB from NovaTech, and Piston and Cylinder Kit spread across all vendors at similar rates.
 
-> **Expected results**: The top 5 should be: TCM-3200 Main PCB / Novatech (3.07%), TC-5000 VGT Actuator / Precision Dynamics (2.58%), then three ACM-2800 Piston and Cylinder Kit rows from Midwest Pneumatics (1.16%), Heartland Steel (1.15%), and Great Lakes (0.93%). If Unit Count shows ~1 per row instead of thousands, the agent is computing units within the claims join instead of from the full PARTS table.
+> **Expected results**: #1 VGT Actuator / Precision Dynamics (~1.5%), #2 Main PCB / Novatech (~1.3%), #3-5 Piston and Cylinder Kit from Midwest Pneumatics, Great Lakes, and Heartland Steel (~1.0% each). If results show 100% failure rates, the agent is computing units within the claims join instead of from the full PARTS table — see troubleshooting below.
 
-> **If results don't match** — add a Verified Query to anchor the failure rate calculation:
+> **If results show 100% failure rates** — add a Verified Query to anchor the calculation:
 >
 > ```
-> $semantic-view Add a verified query to COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS for the question "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order". The verified SQL should compute UNIT_COUNT as COUNT(DISTINCT PARTS.SERIAL_NUMBER) grouped by PARTS.PART_NUMBER and PARTS.SUB_PART in a CTE, then count claims from WARRANTY_CLAIMS grouped by PART_NUMBER, FAILED_SUB_PART joined to PARTS and SUPPLIERS for COMPANY_NAME, then join to the UNIT_COUNT CTE on part_number and sub_part, calculate failure_rate as claim_count / unit_count, and ORDER BY failure_rate DESC LIMIT 5. The verified query ensures the three embedded data stories surface correctly: VGT Actuator (bad batch from Precision Dynamics), Main PCB (bad supplier NovaTech), and Piston and Cylinder Kit (design problem — similar rates across all 3 vendors: Midwest Pneumatics, Great Lakes, Heartland Steel).
+> /semantic_studio Add a verified query to COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS for the question "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order". The verified SQL should compute UNIT_COUNT as COUNT(DISTINCT PARTS.SERIAL_NUMBER) grouped by PARTS.PART_NUMBER and PARTS.SUB_PART in a CTE, then count claims from WARRANTY_CLAIMS grouped by PART_NUMBER, FAILED_SUB_PART joined to PARTS and SUPPLIERS for COMPANY_NAME, then join to the UNIT_COUNT CTE on part_number and sub_part, calculate failure_rate as claim_count / unit_count, and ORDER BY failure_rate DESC LIMIT 5.
 > ```
 >
 > Then re-ask Q2. The VQR gives Cortex Analyst a reference SQL pattern for failure rate queries.
@@ -360,8 +320,8 @@ Evaluate failures for Main PCB and VGT Actuator sub parts down to the vendor and
 ```
 
 > **What it shows**: The money question. The agent must reason about two different failure patterns:
-> - **Main PCB**: NovaTech (SUP-002) has 3.07% failure rate while Berg Elektronik has 0% and Precision Dynamics 0.23%. Failures span ALL NovaTech batches → bad supplier.
-> - **VGT Actuator**: Precision Dynamics (SUP-001) has elevated failures, but drill into batches and batch B-2024-PD-VA-07 is the outlier at 5.7% while other batches are <1.3% → bad batch.
+> - **Main PCB**: NovaTech has elevated failure rate while Berg Elektronik and Precision Dynamics are near zero. Failures span ALL NovaTech batches → bad supplier.
+> - **VGT Actuator**: Precision Dynamics has elevated failures, but drill into batches and batch B-2024-PD-VA-07 is the outlier while other batches are much lower → bad batch.
 > This question forces the agent to compare suppliers AND batches, surfacing both patterns in one answer.
 
 ### Q4: Cross-Tool — Data + Docs (The Wow Moment)
