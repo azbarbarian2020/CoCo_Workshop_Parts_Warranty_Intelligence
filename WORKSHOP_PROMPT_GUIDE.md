@@ -167,14 +167,12 @@ What are the 20 most common categories for describing major mechanical issues wi
 
 > **Talk track**: "I'm just asking CoCo for domain knowledge — no SQL needed."
 
-CoCo returns a list. Copy it, then:
+CoCo returns a list. Then:
 
 **PROMPT 4b**:
 
 ```
-Using llama3.1-70b, compare these 20 categories against the summaries in COCO_WORKSHOP.SILVER.COMPLAINT_SUMMARIES and select the 10 that best match our data. Save each as a row in COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES:
-
-[paste the 20 categories from CoCo's response above]
+Using llama3.1-70b, compare those 20 categories against the summaries in COCO_WORKSHOP.SILVER.COMPLAINT_SUMMARIES and select the 10 that best match our data. Save each as a row in COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES.
 ```
 
 > **Talk track**: "Now I'm combining LLM domain knowledge with our actual data. It picks the 10 categories that best describe what we're seeing."
