@@ -3,7 +3,7 @@
 ## Prompt Guide & Talk Track
 
 **Duration**: ~30 minutes
-**Platform**: Cortex Code (CoCo)
+**Platform**: Cortex Code (CoCo) in Snowsight
 **Database**: COCO_WORKSHOP
 **Schemas**: BRONZE, SILVER, GOLD
 **Warehouse**: COCO_WORKSHOP_WH (Gen2 Medium)
@@ -87,10 +87,6 @@ Three distinct failure patterns are embedded for discovery during the demo:
 
 ## Step 0: Set Context
 
-**WHY**: Tell CoCo which database and warehouse to use for the entire session.
-
-**PROMPT**:
-
 ```
 Use database COCO_WORKSHOP and warehouse COCO_WORKSHOP_WH for this session.
 ```
@@ -103,16 +99,15 @@ Use database COCO_WORKSHOP and warehouse COCO_WORKSHOP_WH for this session.
 
 ### Step 1: Clean Supplier Data
 
-**WHY**: SUPPLIER_RAW has 12 rows but only 10 real suppliers. It contains inconsistent company name casing ("NOVATECH ELECTRONICS, LLC" vs "Precision Dynamics LLC"), full state names mixed with abbreviations ("Illinois" vs "CA"), leading/trailing spaces, inconsistent country values ("US" vs "USA" vs "United States"), and duplicate rows. CoCo should find and fix all of this.
+**WHY**: SUPPLIER_RAW has 12 rows but only 10 real suppliers — duplicates, inconsistent casing, mixed state formats, extra spaces.
 
-**PROMPT** (copy/paste into CoCo):
+**PROMPT**:
 
 ```
 Analyze COCO_WORKSHOP.BRONZE.SUPPLIER_RAW for data quality issues.
-
 ```
 
-> **Talk track**: "Let's start with the dirtiest table. I'm just asking CoCo to look at it — I'm not telling it what's wrong. Watch it discover the problems on its own."
+> **Talk track**: "I'm just asking CoCo to look at it — I'm not telling it what's wrong. Watch it discover the problems on its own."
 
 CoCo will identify the issues. Then follow up:
 
@@ -120,15 +115,15 @@ CoCo will identify the issues. Then follow up:
 Clean COCO_WORKSHOP.BRONZE.SUPPLIER_RAW into a new table COCO_WORKSHOP.GOLD.SUPPLIERS. Fix the issues you identified.
 ```
 
-> **Talk track**: "One follow-up prompt and CoCo writes the entire cleaning pipeline — deduplication, case normalization, state standardization, trimming. No pandas, no dbt, just natural language."
+> **Talk track**: "One follow-up prompt and CoCo writes the entire cleaning pipeline — deduplication, case normalization, state standardization, trimming."
 
-**RESULT**: GOLD.SUPPLIERS — 10 clean rows, proper casing, 2-letter state codes, consistent "US" country.
+**RESULT**: GOLD.SUPPLIERS — 10 clean rows.
 
 ---
 
 ### Step 2: Flatten Parts BOM
 
-**WHY**: PARTS_RAW stores the bill of materials as a JSON array in a single BOM column. Each serial number has one row with a JSON array containing 7 sub-parts, each with a supplier_id and batch_id. Three key sub-parts (VGT Actuator, Main PCB, Piston & Cylinder Kit) are multi-sourced from 2-3 suppliers. We need to flatten this into a relational format — one row per serial_number + sub_part — so we can join to warranty claims and suppliers.
+**WHY**: PARTS_RAW stores the bill of materials as a JSON array. We need one row per serial_number + sub_part.
 
 **PROMPT**:
 
@@ -138,7 +133,7 @@ Flatten the BOM JSON array in COCO_WORKSHOP.BRONZE.PARTS_RAW into a new table CO
 
 > **Talk track**: "The parts data is nested JSON — each serial number has 7 sub-parts stuffed into one column. CoCo uses LATERAL FLATTEN to explode this into a proper relational table. 25,000 rows become 175,000."
 
-**RESULT**: GOLD.PARTS — 175,000 rows (25,000 serial numbers x 7 sub-parts each). Columns: PART_NUMBER, SERIAL_NUMBER, SUB_PART, SUPPLIER_ID, BATCH_ID.
+**RESULT**: GOLD.PARTS — 175,000 rows.
 
 ---
 
@@ -146,79 +141,81 @@ Flatten the BOM JSON array in COCO_WORKSHOP.BRONZE.PARTS_RAW into a new table CO
 
 ### Step 3: Summarize Complaints by Part
 
-**WHY**: We have 600 warranty claims with free-text customer complaints. Before we can classify them, we need to understand what kinds of complaints exist for each part type. AI_SUMMARIZE_AGG condenses hundreds of complaints per part into a single summary paragraph — giving us a high-level view of failure patterns.
+**WHY**: We need a high-level view of complaint patterns before classifying. AI_SUMMARIZE_AGG condenses hundreds of complaints per part into one paragraph.
 
 **PROMPT**:
 
 ```
-Summarize all customer_complaint values in COCO_WORKSHOP.BRONZE.WARRANTY_CLAIMS_RAW grouped by part_number using AI_SUMMARIZE_AGG. Save to COCO_WORKSHOP.SILVER.COMPLAINT_SUMMARIES.
+Summarize all customer_complaint values in COCO_WORKSHOP.BRONZE.WARRANTY_CLAIMS_RAW grouped by part_number. Save to COCO_WORKSHOP.SILVER.COMPLAINT_SUMMARIES.
 ```
 
-> **Talk track**: "We have 600 free-text complaints. Instead of reading them all, I'll ask Snowflake's built-in AI to summarize them by part type. One SQL function call — no external API, no tokens to manage."
+> **Talk track**: "We have 600 free-text complaints. Instead of reading them all, I ask Snowflake's built-in AI to summarize them by part type. One function call — no external API, no tokens to manage."
 
-**RESULT**: SILVER.COMPLAINT_SUMMARIES — 5 rows (one per part type), each with a paragraph summarizing the common complaint themes.
+**RESULT**: SILVER.COMPLAINT_SUMMARIES — 5 rows (one per part type).
 
 ---
 
 ### Step 4: Discover Symptom Categories
 
-**WHY**: We need a controlled vocabulary of symptom categories to classify complaints. Instead of manually curating a list, we use a two-step AI approach: first ask the LLM for general trucking symptom categories, then refine against our actual data.
+**WHY**: We need a controlled vocabulary of symptom categories. We use a two-step AI approach: ask for general trucking categories, then refine against our data.
 
-**PROMPT 4a** (ask CoCo directly, no SQL needed):
+**PROMPT 4a** (ask CoCo directly):
 
 ```
-What are the 20 most common and unique categories for describing major mechanical issues with big rig trucks using plain driver language?
+What are the 20 most common categories for describing major mechanical issues with big rig trucks using plain driver language? List only the category names, no descriptions.
 ```
 
-> **Talk track**: "I'm not writing SQL here — I'm just asking CoCo for domain knowledge. It knows trucking terminology because the underlying LLM was trained on it."
+> **Talk track**: "I'm just asking CoCo for domain knowledge — no SQL needed."
 
-CoCo returns a list of ~20 categories. Copy the list, then:
+CoCo returns a list. Copy it, then:
 
 **PROMPT 4b**:
 
 ```
-Using COMPLETE with llama3.1-70b, compare these categories against the summaries in COCO_WORKSHOP.SILVER.COMPLAINT_SUMMARIES and select the 10 that best match our data. Save each as a row in COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES: [paste the list from 4a here]
+Using llama3.1-70b, compare these 20 categories against the summaries in COCO_WORKSHOP.SILVER.COMPLAINT_SUMMARIES and select the 10 that best match our data. Save each as a row in COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES:
+
+[paste the 20 categories from CoCo's response above]
 ```
 
-> **Talk track**: "Now I'm combining the LLM's domain knowledge with our actual complaint summaries. It reads both and picks the 10 categories that best describe what we're actually seeing. This is the kind of human-in-the-loop AI workflow that CoCo makes easy."
+> **Talk track**: "Now I'm combining LLM domain knowledge with our actual data. It picks the 10 categories that best describe what we're seeing."
 
-**RESULT**: SILVER.SYMPTOM_CATEGORIES — 10 rows, each a distinct symptom category tailored to our data (e.g., "Engine Overheating", "Electrical Failure", "Exhaust System Issues", etc.)
+**RESULT**: SILVER.SYMPTOM_CATEGORIES — 10 rows.
 
 ---
 
 ### Step 5: Classify Complaints by Symptom
 
-**WHY**: Now we tag each of the 600 warranty claims with one of our 10 symptom categories. This turns unstructured text into a filterable, groupable dimension. AI_CLASSIFY is Snowflake's built-in classification function — it reads the text and picks the best matching label from a provided list.
+**WHY**: Tag each warranty claim with a symptom category, turning free text into a filterable dimension.
 
 **PROMPT**:
 
 ```
-Using AI_CLASSIFY with task_description 'Classify the truck driver warranty complaint into the primary symptom category', classify each customer_complaint in COCO_WORKSHOP.BRONZE.WARRANTY_CLAIMS_RAW using the categories from COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES. Save as COCO_WORKSHOP.SILVER.WARRANTY_CLAIMS with all original columns plus a symptom_category column.
+Classify each customer_complaint in COCO_WORKSHOP.BRONZE.WARRANTY_CLAIMS_RAW into one of the categories from COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES. Save as COCO_WORKSHOP.SILVER.WARRANTY_CLAIMS with all original columns plus a symptom_category column.
 ```
 
-> **Talk track**: "AI_CLASSIFY reads each complaint and assigns the best-matching symptom category. No training data, no fine-tuning — it just works. 600 claims classified in about a minute."
+> **Talk track**: "AI_CLASSIFY reads each complaint and assigns the best-matching symptom category. No training data, no fine-tuning — it just works."
 
-**TIMING**: ~1-3 minutes. AI_CLASSIFY makes one LLM inference call per row (600 calls). Execution time varies by region and Cortex AI load.
+**TIMING**: ~1-3 minutes (600 AI_CLASSIFY calls).
 
-**RESULT**: SILVER.WARRANTY_CLAIMS — 600 rows, all original columns + SYMPTOM_CATEGORY.
+**RESULT**: SILVER.WARRANTY_CLAIMS — 600 rows + SYMPTOM_CATEGORY.
 
 ---
 
 ### Step 6: Classify Failed Sub-Parts
 
-**WHY**: This is the key enrichment step. Each warranty claim describes a failure in the technician's notes, but doesn't say WHICH sub-part failed. We use AI_CLASSIFY to read the technician_notes and determine which of the 7 possible sub-parts (from the GOLD.PARTS table) is the failed component. This enables root cause analysis by sub-part, supplier, and batch.
+**WHY**: The key enrichment step. Each warranty claim doesn't say WHICH sub-part failed. AI_CLASSIFY reads the technician_notes and determines the failed component from the 7 possible sub-parts for that part type.
 
 **PROMPT**:
 
 ```
-Using AI_CLASSIFY with task_description 'Identify which single sub-component caused the warranty claim failure based on technician repair notes', classify each claim in COCO_WORKSHOP.SILVER.WARRANTY_CLAIMS by the failed sub-part. For each claim, use the distinct sub_part values from COCO_WORKSHOP.GOLD.PARTS matching that claim's part_number as the categories. Classify the technician_notes column. Save as COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS with all columns plus a failed_sub_part column.
+For each claim in COCO_WORKSHOP.SILVER.WARRANTY_CLAIMS, classify which sub-part failed based on technician_notes. Use the distinct sub_parts from COCO_WORKSHOP.GOLD.PARTS for that claim's part_number as categories. Focus on root cause — the component that failed, not downstream effects. Save as COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS with a failed_sub_part column.
 ```
 
-> **Talk track**: "This is the magic moment. The AI reads each technician's repair notes and figures out which sub-component actually failed. It uses the parts BOM as the category list — so for a turbocharger claim, it chooses from VGT Actuator, Compressor Wheel, Bearing Housing, etc. Now we can trace failures back to specific suppliers and batches."
+> **Talk track**: "This is the magic moment. The AI reads each technician's repair notes and figures out which sub-component actually failed. Now we can trace failures back to specific suppliers and batches."
 
-**TIMING**: ~2-5 minutes. This is the longest-running step — each of the 600 claims requires an AI_CLASSIFY call with a correlated subquery. Let it run.
+**TIMING**: ~2-5 minutes (longest step).
 
-**RESULT**: GOLD.WARRANTY_CLAIMS — 600 rows, all columns + FAILED_SUB_PART. This is the final claims table.
+**RESULT**: GOLD.WARRANTY_CLAIMS — 600 rows + FAILED_SUB_PART.
 
 ---
 
@@ -226,66 +223,65 @@ Using AI_CLASSIFY with task_description 'Identify which single sub-component cau
 
 ### Step 7: Create the Semantic View
 
-**WHY**: A semantic view tells Cortex Analyst how to translate natural language questions into SQL. It defines which tables exist, how they join, what the metrics are, and what each column means. Without it, the AI agent wouldn't know that "vendor" means COMPANY_NAME or that failure rate = claims / total deployed parts.
+**WHY**: A semantic view tells Cortex Analyst how to translate natural language questions into SQL — table relationships, metrics, and column meanings.
 
 **PROMPT**:
 
 ```
-/semantic_studio Create a semantic view called COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS over COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS, COCO_WORKSHOP.GOLD.PARTS, and COCO_WORKSHOP.GOLD.SUPPLIERS. WARRANTY_CLAIMS joins to PARTS on SERIAL_NUMBER and FAILED_SUB_PART = SUB_PART. PARTS joins to SUPPLIERS on SUPPLIER_ID. Include PART_NUMBER as a dimension on both WARRANTY_CLAIMS and PARTS tables. Include a UNIT_COUNT metric as COUNT(DISTINCT PARTS.SERIAL_NUMBER) for failure rate denominators — failure rate should be calculated as claim count divided by UNIT_COUNT. Add synonyms so 'vendor' maps to COMPANY_NAME and 'component' maps to SUB_PART. Use pure SQL DDL.
+/semantic_studio Create a semantic view called COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS over COCO_WORKSHOP.GOLD.WARRANTY_CLAIMS, COCO_WORKSHOP.GOLD.PARTS, and COCO_WORKSHOP.GOLD.SUPPLIERS. WARRANTY_CLAIMS joins to PARTS on SERIAL_NUMBER and FAILED_SUB_PART = SUB_PART. PARTS joins to SUPPLIERS on SUPPLIER_ID. Include PART_NUMBER as a dimension on both WARRANTY_CLAIMS and PARTS. Include a UNIT_COUNT metric as COUNT(DISTINCT PARTS.SERIAL_NUMBER). Add synonyms: 'vendor' = COMPANY_NAME, 'component' = SUB_PART.
 ```
 
-> **Talk track**: "The semantic view is the bridge between natural language and SQL. I'm defining the table relationships, the metrics, and giving the AI hints about how to calculate failure rates. Notice I'm using pure SQL — no YAML files, no staging, just DDL."
+> **Talk track**: "The semantic view is the bridge between natural language and SQL. I'm defining table relationships, metrics, and hints — pure SQL DDL, no YAML files."
 
-**RESULT**: Semantic view COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS with 3 tables, 2 relationships, metrics + dimensions including PART_NUMBER on both tables.
+**RESULT**: Semantic view COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS.
 
 ---
 
 ### Step 8: Create Cortex Search Service
 
-**WHY**: The Gold tables give us structured analytics, but technicians also need to look up specs, torque values, and troubleshooting procedures from the parts manuals. A Cortex Search Service indexes the 5 PDF manuals so the AI agent can answer document questions alongside data questions.
+**WHY**: Index the 5 PDF parts manuals so the agent can answer document questions alongside data questions.
 
-**PROMPT 8a** (parse and chunk the PDFs):
-
-```
-Parse the 5 PDF files from @COCO_WORKSHOP.BRONZE.DOCS using AI_PARSE_DOCUMENT and chunk the text into rows of ~500 tokens each. Save to COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS with columns: file_name, chunk_index, chunk_text. Use warehouse COCO_WORKSHOP_WH.
-```
-
-> **Talk track**: "We have 5 PDF parts manuals sitting on a Snowflake stage. CoCo parses them with AI_PARSE_DOCUMENT and chunks the text into searchable pieces."
-
-**PROMPT 8b** (create the search service):
+**PROMPT**:
 
 ```
-Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH on the chunk_text column of COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS. Use warehouse COCO_WORKSHOP_WH.
+Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH over the PDFs in @COCO_WORKSHOP.BRONZE.DOCS. Parse and chunk them first into COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS.
 ```
 
-> **Talk track**: "Now we point a Cortex Search Service at that table. The AI can answer questions like 'what's the torque spec for a turbocharger mounting bolt?' directly from the source documents."
+> **Talk track**: "One prompt — CoCo parses the PDFs, chunks the text, and creates a searchable index. Now the AI can look up torque specs and procedures directly from the source documents."
 
-**RESULT**: BRONZE.DOCS_EMBEDDINGS (chunked text from 5 PDFs) and GOLD.PARTS_MANUAL_SEARCH (Cortex Search Service, active).
+**If CoCo stalls**, split into two prompts:
+
+> ```
+> Parse the 5 PDF files from @COCO_WORKSHOP.BRONZE.DOCS and chunk the text into ~500 token rows. Save to COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS with columns: file_name, chunk_index, chunk_text.
+> ```
+> Then:
+> ```
+> Create a Cortex Search Service called COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH on the chunk_text column of COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS.
+> ```
+
+**RESULT**: GOLD.PARTS_MANUAL_SEARCH (active Cortex Search Service).
 
 ---
 
 ### Step 9: Create the Cortex Agent (Grand Finale)
 
-**WHY**: This is the payoff. A Cortex Agent combines the semantic view (structured warranty data) with the search service (parts manual documents) into a single conversational interface. One agent that can answer both "what's our failure rate for VGT Actuators?" and "what does the manual say about actuator inspection?" — and combine both in a single answer.
+**WHY**: A Cortex Agent combines structured analytics (semantic view) with document search into one conversational interface.
 
 **PROMPT**:
 
 ```
-Create a Cortex Agent called COCO_WORKSHOP.GOLD.WARRANTY_AGENT that combines:
-1. The COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH Cortex Search Service for looking up parts manual specs and procedures
-2. The COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS semantic view for querying warranty claims, parts, and supplier data
-Use warehouse COCO_WORKSHOP_WH. In the agent instructions, specify that all questions about failure rates, claims, parts, suppliers, or warranty data must be answered using the WARRANTY_ANALYTICS semantic view tool — never generate SQL directly.
+Create a Cortex Agent called COCO_WORKSHOP.GOLD.WARRANTY_AGENT that combines the COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH search service and the COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS semantic view. Use warehouse COCO_WORKSHOP_WH. In the agent instructions, specify that all questions about failure rates, claims, parts, or suppliers must use the WARRANTY_ANALYTICS semantic view tool.
 ```
 
-> **Talk track**: "One prompt. We just built an AI agent that combines structured data analytics with unstructured document search. No API integration, no RAG framework, no vector database plumbing — just declare what tools the agent has and Snowflake handles the orchestration."
+> **Talk track**: "One prompt. We just built an AI agent that combines structured data analytics with document search. No API integration, no RAG framework — just declare the tools and Snowflake handles the orchestration."
 
-**RESULT**: GOLD.WARRANTY_AGENT — a Cortex Agent with two tools: query_warranty_data (semantic view) and search_parts_manuals (Cortex Search).
+**RESULT**: GOLD.WARRANTY_AGENT — Cortex Agent with two tools.
 
 ---
 
 ## Testing the Agent
 
-After the agent is created, test it with these 4 questions. The flow tells a story: big picture → drill-down → root cause analysis → document search.
+After the agent is created, test with these 4 questions. The flow tells a story: big picture → drill-down → root cause → documents.
 
 ### Q1: The Heat Map
 
@@ -293,7 +289,7 @@ After the agent is created, test it with these 4 questions. The flow tells a sto
 Show me the parent part failure rates by symptom description in a heat map
 ```
 
-> **What it shows**: The AI_CLASSIFY enrichment from Act 2 (SYMPTOM_CATEGORY) combined with multi-table join. Proves the unstructured customer complaints were turned into a queryable dimension. The agent returns a part × symptom matrix — you can visualize this as a heat map to see where problems cluster.
+> **What it shows**: AI_CLASSIFY enrichment (SYMPTOM_CATEGORY) combined with multi-table join. Proves unstructured complaints became a queryable dimension.
 
 ### Q2: Top Failures Drill-Down
 
@@ -301,17 +297,23 @@ Show me the parent part failure rates by symptom description in a heat map
 Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order
 ```
 
-> **What it shows**: Three-table join, UNIT_COUNT-based failure rate calculation. All three stories surface immediately — VGT Actuator from Precision Dynamics at the top, Main PCB from NovaTech, and Piston and Cylinder Kit spread across all vendors at similar rates.
+> **What it shows**: Three-table join with UNIT_COUNT-based failure rate. All three data stories surface: Piston and Cylinder Kit (design problem — all 3 vendors at similar rates), VGT Actuator (bad batch from Precision Dynamics), and Main PCB (bad supplier NovaTech).
 
-> **Expected results**: #1 VGT Actuator / Precision Dynamics (~1.5%), #2 Main PCB / Novatech (~1.3%), #3-5 Piston and Cylinder Kit from Midwest Pneumatics, Great Lakes, and Heartland Steel (~1.0% each). If results show 100% failure rates, the agent is computing units within the claims join instead of from the full PARTS table — see troubleshooting below.
+> **Expected results**:
+>
+> | # | Part | Sub-Part | Vendor | Claims | Units | Failure Rate |
+> |---|------|----------|--------|--------|-------|--------------|
+> | 1 | ACM-2800 | Piston and Cylinder Kit | Heartland Steel Fabrication | 49 | 1,305 | 3.75% |
+> | 2 | TC-5000 | VGT Actuator | Precision Dynamics Llc | 59 | 2,014 | 2.93% |
+> | 3 | TCM-3200 | Main PCB | Novatech Electronics, Llc | 58 | 1,988 | 2.92% |
+> | 4 | ACM-2800 | Piston and Cylinder Kit | Great Lakes Castings Corp | 49 | 1,717 | 2.85% |
+> | 5 | ACM-2800 | Piston and Cylinder Kit | Midwest Pneumatics, Inc. | 52 | 1,978 | 2.63% |
 
-> **If results show 100% failure rates** — add a Verified Query to anchor the calculation:
+> **If results show 100% failure rates** — add a Verified Query:
 >
 > ```
-> /semantic_studio Add a verified query to COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS for the question "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order". The verified SQL should compute UNIT_COUNT as COUNT(DISTINCT PARTS.SERIAL_NUMBER) grouped by PARTS.PART_NUMBER and PARTS.SUB_PART in a CTE, then count claims from WARRANTY_CLAIMS grouped by PART_NUMBER, FAILED_SUB_PART joined to PARTS and SUPPLIERS for COMPANY_NAME, then join to the UNIT_COUNT CTE on part_number and sub_part, calculate failure_rate as claim_count / unit_count, and ORDER BY failure_rate DESC LIMIT 5.
+> /semantic_studio Add a verified query to COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS for the question "Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped in that order in descending order". The SQL should compute UNIT_COUNT as COUNT(DISTINCT SERIAL_NUMBER) from PARTS grouped by PART_NUMBER and SUB_PART in a CTE, then count claims joined to PARTS and SUPPLIERS, then calculate failure_rate as claim_count / unit_count, ORDER BY failure_rate DESC LIMIT 5.
 > ```
->
-> Then re-ask Q2. The VQR gives Cortex Analyst a reference SQL pattern for failure rate queries.
 
 ### Q3: Root Cause Analysis (Bad Supplier vs Bad Batch)
 
@@ -319,10 +321,9 @@ Show me the top 5 failure rates for all parts, sub-parts, and vendors, grouped i
 Evaluate failures for Main PCB and VGT Actuator sub parts down to the vendor and batch level to determine if the issues appear to be more of a vendor problem or a batch problem.
 ```
 
-> **What it shows**: The money question. The agent must reason about two different failure patterns:
-> - **Main PCB**: NovaTech has elevated failure rate while Berg Elektronik and Precision Dynamics are near zero. Failures span ALL NovaTech batches → bad supplier.
-> - **VGT Actuator**: Precision Dynamics has elevated failures, but drill into batches and batch B-2024-PD-VA-07 is the outlier while other batches are much lower → bad batch.
-> This question forces the agent to compare suppliers AND batches, surfacing both patterns in one answer.
+> **What it shows**: The agent reasons about two failure patterns:
+> - **Main PCB**: NovaTech has elevated failure rate, others near zero. All batches affected → bad supplier.
+> - **VGT Actuator**: Precision Dynamics elevated, but batch B-2024-PD-VA-07 is the outlier → bad batch.
 
 ### Q4: Cross-Tool — Data + Docs (The Wow Moment)
 
@@ -330,7 +331,7 @@ Evaluate failures for Main PCB and VGT Actuator sub parts down to the vendor and
 What are possible cascading effects of a Main PCB going out in a TCM-3200?
 ```
 
-> **What it shows**: First time the audience sees the search tool fire. The agent pulls from the TCM-3200 parts manual to explain how a Main PCB failure can cascade to other sub-components (solenoid pack burnout from incorrect line pressure commands, pressure transducer damage from overcurrent sensing, wiring harness issues). This demonstrates the agent reasoning across structured warranty data AND unstructured PDF documents in a single answer.
+> **What it shows**: The search tool fires for the first time. The agent pulls from the TCM-3200 parts manual to explain how a Main PCB failure cascades to other sub-components. Demonstrates reasoning across structured data AND unstructured documents in one answer.
 
 ---
 
@@ -340,25 +341,8 @@ What are possible cascading effects of a Main PCB going out in a TCM-3200?
 |----------|-------------|-----------------|
 | **AI_SUMMARIZE_AGG** | Aggregates and summarizes multiple text values into one paragraph | Step 3: Summarize 600 complaints into 5 part-level summaries |
 | **COMPLETE** (llama3.1-70b) | General-purpose LLM for text generation and reasoning | Step 4b: Select 10 best symptom categories from 20 candidates |
-| **AI_CLASSIFY** | Classifies text into one of N provided categories | Step 5: Tag complaints with symptom categories. Step 6: Identify failed sub-parts from technician notes. |
-| **PARSE_DOCUMENT** | Extracts text content from PDF/image files on a stage | Step 8: Parse parts manual PDFs into searchable text chunks |
-
----
-
-## Quick Reference: Table & Service Lineage
-
-| Asset | Source | Transformation |
-|-------|--------|----------------|
-| GOLD.WARRANTY_AGENT | WARRANTY_ANALYTICS + PARTS_MANUAL_SEARCH | Cortex Agent combining structured data + document search |
-| GOLD.PARTS_MANUAL_SEARCH | BRONZE.DOCS_EMBEDDINGS | Cortex Search Service over chunked PDF text |
-| GOLD.WARRANTY_ANALYTICS | GOLD.WARRANTY_CLAIMS + GOLD.PARTS + GOLD.SUPPLIERS | Semantic view: 3 tables, 2 joins, metrics + dimensions |
-| GOLD.SUPPLIERS | BRONZE.SUPPLIER_RAW | Dedup, normalize casing, standardize states/country, trim spaces |
-| GOLD.PARTS | BRONZE.PARTS_RAW | LATERAL FLATTEN on BOM JSON array, extract sub_part/supplier_id/batch_id |
-| GOLD.WARRANTY_CLAIMS | SILVER.WARRANTY_CLAIMS + GOLD.PARTS | AI_CLASSIFY technician_notes against sub-part categories per part_number |
-| BRONZE.DOCS_EMBEDDINGS | @BRONZE.DOCS (5 PDFs) | PARSE_DOCUMENT + text chunking |
-| SILVER.WARRANTY_CLAIMS | BRONZE.WARRANTY_CLAIMS_RAW + SILVER.SYMPTOM_CATEGORIES | AI_CLASSIFY customer_complaint against 10 symptom categories |
-| SILVER.COMPLAINT_SUMMARIES | BRONZE.WARRANTY_CLAIMS_RAW | AI_SUMMARIZE_AGG grouped by part_number |
-| SILVER.SYMPTOM_CATEGORIES | SILVER.COMPLAINT_SUMMARIES + LLM knowledge | COMPLETE selects 10 best categories from 20 LLM-generated candidates |
+| **AI_CLASSIFY** | Classifies text into one of N provided categories | Step 5: Tag complaints with symptom categories. Step 6: Identify failed sub-parts. |
+| **AI_PARSE_DOCUMENT** | Extracts text content from PDF/image files on a stage | Step 8a: Parse parts manual PDFs into searchable text chunks |
 
 ---
 
@@ -366,22 +350,20 @@ What are possible cascading effects of a Main PCB going out in a TCM-3200?
 
 | Issue | Fix |
 |-------|-----|
-| AI_CLASSIFY returns empty strings | Add `task_description` to the config object — it dramatically improves accuracy |
-| AI_CLASSIFY JSON path wrong | AI_CLASSIFY returns `{"labels":["value"]}` — extract with `['labels'][0]::VARCHAR`, NOT `:label::VARCHAR` |
-| AI_SUMMARIZE_AGG unknown function | Use `AI_SUMMARIZE_AGG(...)` without the `SNOWFLAKE.CORTEX.` schema prefix |
-| Semantic view creation fails with "referenced key must be primary or unique" | Ensure PRIMARY KEY is defined on the referenced table's join columns |
-| SEMANTIC_VIEW query fails with "multiple columns" | You can't mix metrics from different tables in one SEMANTIC_VIEW() call — use Cortex Analyst instead |
-| COMPLETE returns malformed output | Specify the model explicitly: `SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b', prompt)` |
-| Semantic view has 0 metrics | Use `metrics` with full aggregate expressions (e.g., `COUNT(TABLE.COL)`), not `measures` or `default_aggregation` |
-| Agent spec "unrecognized field" | Use `tool_spec.type/name/description` format, NOT `tool_type/tool_name`. `tool_resources` is top-level keyed by tool name. |
-| Agent error "Analyst tool is missing an execution environment" | The semantic view tool needs a warehouse. Fix in Snowsight: Edit the agent → find the WarrantyAnalytics tool → add warehouse `COCO_WORKSHOP_WH` in the tool's execution settings. |
+| AI_CLASSIFY returns empty strings | Add `task_description` to the config object |
+| AI_CLASSIFY JSON path wrong | Extract with `['labels'][0]::VARCHAR`, NOT `:label::VARCHAR` |
+| AI_SUMMARIZE_AGG unknown function | Use without the `SNOWFLAKE.CORTEX.` schema prefix |
+| Semantic view creation fails | Ensure PRIMARY KEY is defined on referenced table's join columns |
+| COMPLETE returns malformed output | Specify model: `SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b', prompt)` |
+| Semantic view has 0 metrics | Use full aggregate expressions (e.g., `COUNT(TABLE.COL)`) |
+| Agent "Analyst tool missing execution environment" | Edit agent in Snowsight → add COCO_WORKSHOP_WH to the semantic view tool's execution settings |
+| Q2 returns 100% failure rates | The agent isn't using the semantic view properly. Add a VQR (see Q2 fallback above) |
 
 ---
 
 ## Cleanup
 
 ```sql
--- Drop demo artifacts (preserves Bronze for re-run)
 DROP AGENT IF EXISTS COCO_WORKSHOP.GOLD.WARRANTY_AGENT;
 DROP CORTEX SEARCH SERVICE IF EXISTS COCO_WORKSHOP.GOLD.PARTS_MANUAL_SEARCH;
 DROP SEMANTIC VIEW IF EXISTS COCO_WORKSHOP.GOLD.WARRANTY_ANALYTICS;
@@ -392,5 +374,4 @@ DROP TABLE IF EXISTS COCO_WORKSHOP.SILVER.WARRANTY_CLAIMS;
 DROP TABLE IF EXISTS COCO_WORKSHOP.SILVER.SYMPTOM_CATEGORIES;
 DROP TABLE IF EXISTS COCO_WORKSHOP.SILVER.COMPLAINT_SUMMARIES;
 DROP TABLE IF EXISTS COCO_WORKSHOP.BRONZE.DOCS_EMBEDDINGS;
--- Bronze tables and stages are preserved for re-running the demo
 ```
