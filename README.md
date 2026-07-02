@@ -1,5 +1,7 @@
 # CoCo Workshop: Parts Warranty Intelligence
 
+> **Multi-User?** If running this workshop with multiple participants on the same Snowflake account, use [`sql/00_setup_multiuser.sql`](sql/00_setup_multiuser.sql) and [`WORKSHOP_PROMPT_GUIDE_MULTIUSER.md`](WORKSHOP_PROMPT_GUIDE_MULTIUSER.md) instead. These versions prefix each user's database and warehouse with their username so participants don't collide.
+
 A ~30-minute hands-on workshop that builds an AI-powered warranty analytics agent from scratch using **Cortex Code (CoCo)** and natural language prompts. No code is written manually — every table, transformation, semantic view, search service, and agent is created by prompting CoCo.
 
 ## What You Build
